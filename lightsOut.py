@@ -1,4 +1,6 @@
 import pygame
+import math
+import numpy as np
 
 ### Globals ###
 
@@ -11,32 +13,32 @@ TILE_HEIGHT = 50
 TILE_WIDTH = 50
 MARGIN = 2
 
-
 ### LightsOut Class ###
 
 class LightsOut:
 
     def __init__(self, fname=None):
         self.clear()
-        if fname != None:
-            self.load_level(fname)
+        # if fname is not None:
+        #     self.load_level(fname)
+        print(self.getAdjacencyMtx())
 
     def clear(self):
-        self.grid = [[0 for i in xrange(BOARD_SIZE)] for j in xrange(BOARD_SIZE)]
+        self.grid = [[0 for i in range(BOARD_SIZE)] for j in range(BOARD_SIZE)]
 
-    def load_level(self, fname):
-        lstr = []
-        f = open(fname)
-        for line in f:
-            lstr += [line.split()[0]]
-        f.close()
-        for y in xrange(len(lstr)):
-            for x in xrange(len(lstr[y])):
-                self.grid[x][y] = int(lstr[y][x])
+    # def load_level(self, fname):
+    #     lstr = []
+    #     f = open(fname)
+    #     for line in f:
+    #         lstr += [line.split()[0]]
+    #     f.close()
+    #     for y in range(len(lstr)):
+    #         for x in range(len(lstr[y])):
+    #             self.grid[x][y] = int(lstr[y][x])
 
     def draw(self):
-        for y in xrange(BOARD_SIZE):
-            for x in xrange(BOARD_SIZE):
+        for y in range(BOARD_SIZE):
+            for x in range(BOARD_SIZE):
                 i = x * TILE_WIDTH + MARGIN
                 j = y * TILE_HEIGHT + MARGIN
                 h = TILE_HEIGHT - (2 * MARGIN)
@@ -46,7 +48,7 @@ class LightsOut:
                 else:
                     pygame.draw.rect(screen, (255, 255, 255), [i, j, w, h])
 
-    def get_adjacent(self, x, y):
+    def getAdjacent(self, x, y):
         adjs = []
         for i, j in adj:
             if (0 <= i + x < BOARD_SIZE) and (0 <= j + y < BOARD_SIZE):
@@ -54,12 +56,33 @@ class LightsOut:
         return adjs
 
     def click(self, pos):
-        x = pos[0] / TILE_WIDTH
-        y = pos[1] / TILE_HEIGHT
-        adjs = self.get_adjacent(x, y)
+        x = math.floor(pos[0] / TILE_WIDTH)
+        y = math.floor(pos[1] / TILE_HEIGHT)
+        print("Clicked: (",x,", ",y,")")
+        adjs = self.getAdjacent(x, y)
         for i, j in adjs:
             self.grid[j][i] = (self.grid[j][i] + 1) % 2
+        print(self.getSolveMtx())
 
+    def getGrid(self):
+        return self.grid
+
+    def getAdjacencyMtx(self):
+        elems = len(self.grid)*len(self.grid[0])
+        adj = [[0 for i in range(elems)] for j in range(elems)]
+        for n in range(elems):
+            x = n % len(self.grid)
+            y = n // len(self.grid)
+            adjs = self.getAdjacent(x, y)
+            for i, j in adjs:
+                adj[n][i+j*len(self.grid)] = 1
+        return np.array(adj)
+
+    def getStateMtx(self):
+        return np.array(self.grid).flatten().transpose()
+
+    def getSolveMtx(self):
+        return np.concatenate((self.getAdjacencyMtx(), self.getStateMtx()[:,None]),axis=1)
 
 ### Main ###
 
@@ -69,7 +92,7 @@ if __name__ == "__main__":
     screen.fill((167, 219, 216))
     pygame.display.set_caption("Lights Out")
 
-    game = LightsOut("level.txt")
+    game = LightsOut()
 
     clock = pygame.time.Clock()
 
