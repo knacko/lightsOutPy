@@ -1,6 +1,10 @@
 import pygame
 import math
 import numpy as np
+import galois
+#import scipy.linalg as sp
+import sage as sg
+from sympy import Matrix, Rational, mod_inverse, pprint
 
 ### Globals ###
 
@@ -59,10 +63,13 @@ class LightsOut:
         x = math.floor(pos[0] / TILE_WIDTH)
         y = math.floor(pos[1] / TILE_HEIGHT)
         print("Clicked: (",x,", ",y,")")
+        self.press(x,y)
+
+    def press(self,x,y):
         adjs = self.getAdjacent(x, y)
         for i, j in adjs:
             self.grid[j][i] = (self.grid[j][i] + 1) % 2
-        print(self.getSolveMtx())
+        pprint(self.solvePuzzle())
 
     def getGrid(self):
         return self.grid
@@ -79,10 +86,22 @@ class LightsOut:
         return np.array(adj)
 
     def getStateMtx(self):
-        return np.array(self.grid).flatten().transpose()
+        return np.array(self.grid).flatten()
 
     def getSolveMtx(self):
         return np.concatenate((self.getAdjacencyMtx(), self.getStateMtx()[:,None]),axis=1)
+
+    def solvePuzzle(self):
+        mtx = Matrix(self.getSolveMtx())
+        mtx = mtx.rref(iszerofunc=lambda x: x % 2 == 0)
+        mtx = mtx[0].applyfunc(lambda x: mod(x, 2))
+        mtx = mtx.col(-1).reshape(len(self.grid), len(self.grid))
+        return mtx
+
+
+def mod(x,modulus):
+    numer, denom = x.as_numer_denom()
+    return numer*mod_inverse(denom,modulus) % modulus
 
 ### Main ###
 
