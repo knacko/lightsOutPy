@@ -98,8 +98,70 @@ class LightsOut:
         mtx = mtx.col(-1).reshape(len(self.grid), len(self.grid))
         return mtx
 
+class Polygon:
+    shape = None
+    adjPolygons = None
+    state = False
+    position = None
+    rotation = None
+    points = None
 
-def mod(x,modulus):
+    def __init__(self, position, rotation):
+        self.position = position
+        self.rotation = rotation
+        self.draw()
+
+    def transformPoints(self):
+        px, py = self.position
+        rot = self.rotation*math.pi/180
+
+        for i, point in enumerate(self.points):
+            ox, oy = point
+            qx = ox + math.cos(rot) * (px - ox) - math.sin(rot) * (py - oy)
+            qy = oy + math.sin(rot) * (px - ox) + math.cos(rot) * (py - oy)
+            self.points[i] = [qx,qy]
+
+    def getAdjPolygons(self):
+        return self.adjPolygons
+
+    def state(self):
+        return self.state
+
+    def spawnAdjPolygons(self):
+        return None
+
+    def draw(self):
+        return None
+
+class AdjPolygon:
+    def __init__(self, shape, position = 0, distance = 0, rotation = 0):
+        self.shape = shape
+        self.position = position
+        self.distance = distance
+        self.rotation = rotation
+
+    def getShape(self):
+        return self.shape
+
+    def getPosition(self):
+        return self.position
+
+    def getDistance(self):
+        return self.distance
+
+    def getRotation(self):
+        return self.rotation
+
+    def incRotation(self, rotation):
+        self.rotation += rotation
+
+class PolygonManager:
+
+
+
+
+
+def mod(x, modulus):
     numer, denom = x.as_numer_denom()
     return numer*mod_inverse(denom,modulus) % modulus
 
