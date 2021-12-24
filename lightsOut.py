@@ -17,7 +17,15 @@ TILE_HEIGHT = 50
 TILE_WIDTH = 50
 MARGIN = 2
 
+#This is the distance multiplier to enable gaps between the polygons
+DISTANCE = 1.1
+
+# This is the scale multiplier. All coordinates for polygons are done with a unit length of 1,
+# so this is the number of pixels per unit length
+SCALE = 50
+
 ### LightsOut Class ###
+
 
 class LightsOut:
 
@@ -28,7 +36,7 @@ class LightsOut:
         print(self.getAdjacencyMtx())
 
     def clear(self):
-        self.grid = [[0 for i in range(BOARD_SIZE)] for j in range(BOARD_SIZE)]
+        self.gameGrid = [[0 for i in range(BOARD_SIZE)] for j in range(BOARD_SIZE)]
 
     # def load_level(self, fname):
     #     lstr = []
@@ -47,7 +55,7 @@ class LightsOut:
                 j = y * TILE_HEIGHT + MARGIN
                 h = TILE_HEIGHT - (2 * MARGIN)
                 w = TILE_WIDTH - (2 * MARGIN)
-                if self.grid[y][x] == 1:
+                if self.gameGrid[y][x] == 1:
                     pygame.draw.rect(screen, (105, 210, 231), [i, j, w, h])
                 else:
                     pygame.draw.rect(screen, (255, 255, 255), [i, j, w, h])
@@ -68,35 +76,48 @@ class LightsOut:
     def press(self,x,y):
         adjs = self.getAdjacent(x, y)
         for i, j in adjs:
-            self.grid[j][i] = (self.grid[j][i] + 1) % 2
-        pprint(self.solvePuzzle())
+            self.gameGrid[j][i] = (self.gameGrid[j][i] + 1) % 2
 
-    def getGrid(self):
-        return self.grid
+    def getGameGrid(self):
+        return self.gameGrid
+
+    def getSolveGrid(self):
+        return self.solveGrid
 
     def getAdjacencyMtx(self):
-        elems = len(self.grid)*len(self.grid[0])
+        elems = len(self.gameGrid)*len(self.gameGrid[0])
         adj = [[0 for i in range(elems)] for j in range(elems)]
         for n in range(elems):
-            x = n % len(self.grid)
-            y = n // len(self.grid)
+            x = n % len(self.gameGrid)
+            y = n // len(self.gameGrid)
             adjs = self.getAdjacent(x, y)
             for i, j in adjs:
-                adj[n][i+j*len(self.grid)] = 1
+                adj[n][i+j*len(self.gameGrid)] = 1
         return np.array(adj)
 
     def getStateMtx(self):
-        return np.array(self.grid).flatten()
+        return np.array(self.gameGrid).flatten()
 
     def getSolveMtx(self):
-        return np.concatenate((self.getAdjacencyMtx(), self.getStateMtx()[:,None]),axis=1)
+        return
 
-    def solvePuzzle(self):
-        mtx = Matrix(self.getSolveMtx())
+
+class Solver:
+
+    def mod(x, modulus):
+        numer, denom = x.as_numer_denom()
+        return numer * mod_inverse(denom, modulus) % modulus
+
+    def getSolveMtx(self, puzzle):
+        return np.concatenate((puzzle.getAdjacencyMtx(), puzzle.getStateMtx()[:, None]), axis=1)
+
+    def solveRREF(self, puzzle):
+        mtx = Matrix(self.getSolveMtx(puzzle))
         mtx = mtx.rref(iszerofunc=lambda x: x % 2 == 0)
-        mtx = mtx[0].applyfunc(lambda x: mod(x, 2))
-        mtx = mtx.col(-1).reshape(len(self.grid), len(self.grid))
+        mtx = mtx[0].applyfunc(lambda x: self.mod(x, 2))
+        mtx = mtx.col(-1).reshape(len(puzzle.getGameGrid()), len(puzzle.getGameGrid()))
         return mtx
+
 
 class Polygon:
     shape = None
@@ -109,7 +130,11 @@ class Polygon:
     def __init__(self, position, rotation):
         self.position = position
         self.rotation = rotation
+
+    def build(self):
+        self.transformPoints()
         self.draw()
+        self.spawnAdjPolygons()
 
     def transformPoints(self):
         px, py = self.position
@@ -133,10 +158,11 @@ class Polygon:
     def draw(self):
         return None
 
+
 class AdjPolygon:
-    def __init__(self, shape, position = 0, distance = 0, rotation = 0):
+    def __init__(self, shape, angle=0, distance=SCALE*DISTANCE,  rotation=0):
         self.shape = shape
-        self.position = position
+        self.angle = angle
         self.distance = distance
         self.rotation = rotation
 
@@ -155,15 +181,38 @@ class AdjPolygon:
     def incRotation(self, rotation):
         self.rotation += rotation
 
-class PolygonManager:
+
+class SquarePolygon(Polygon):
+
+    def __init__(self, position, rotation):
+
+        super().__init__(self, position, rotation)
+
+        self.points = [[-0.5,-0.5],[-0.5,.5],[0.5,0.5],[0.5,-0.5]]*SCALE
+
+        self.adjPolygons = [
+            AdjPolygon(shape="Square", angle=0),
+            AdjPolygon(shape="Square", angle=90),
+            AdjPolygon(shape="Square", angle=180),
+            AdjPolygon(shape="Square", angle=270)
+        ]
+
+        # self.adjPolygons = [
+        #     AdjPolygon(shape = "Square", angle = 0,   distance = SCALE*DISTANCE, rotation = 0),
+        #     AdjPolygon(shape = "Square", angle = 90,  distance = SCALE*DISTANCE, rotation = 0),
+        #     AdjPolygon(shape = "Square", angle = 180, distance = SCALE*DISTANCE, rotation = 0),
+        #     AdjPolygon(shape = "Square", angle = 270, distance = SCALE*DISTANCE, rotation = 0)
+        # ]
+
+        self.build()
 
 
 
-
-
-def mod(x, modulus):
-    numer, denom = x.as_numer_denom()
-    return numer*mod_inverse(denom,modulus) % modulus
+def polarToCart(dist, angle):
+    angle = math.radians(angle)
+    x = dist * math.cos(angle)
+    y = dist * math.sin(angle)
+    return x,y
 
 ### Main ###
 
