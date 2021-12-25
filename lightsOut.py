@@ -17,17 +17,18 @@ TILE_HEIGHT = 50
 TILE_WIDTH = 50
 MARGIN = 2
 
-#This is the distance multiplier to enable gaps between the polygons
+# This is the distance multiplier to enable gaps between the polygons
 DISTANCE = 1.1
 
 # This is the scale multiplier. All coordinates for polygons are done with a unit length of 1,
 # so this is the number of pixels per unit length
 SCALE = 50
 
-### LightsOut Class ###
-
 
 class LightsOut:
+
+    polygons = None
+    moves = None
 
     def __init__(self, fname=None):
         self.clear()
@@ -101,6 +102,8 @@ class LightsOut:
     def getSolveMtx(self):
         return
 
+    def addPolygon(self, polygon):
+        self.polygons.append(polygon)
 
 class Solver:
 
@@ -127,9 +130,11 @@ class Polygon:
     rotation = None
     points = None
 
-    def __init__(self, position, rotation):
+    def __init__(self, position, rotation, points, adjPolygons):
         self.position = position
         self.rotation = rotation
+        self.points = points
+        self.adjPolygons = adjPolygons
 
     def build(self):
         self.transformPoints()
@@ -144,7 +149,7 @@ class Polygon:
             ox, oy = point
             qx = ox + math.cos(rot) * (px - ox) - math.sin(rot) * (py - oy)
             qy = oy + math.sin(rot) * (px - ox) + math.cos(rot) * (py - oy)
-            self.points[i] = [qx,qy]
+            self.points[i] = [qx, qy]
 
     def getAdjPolygons(self):
         return self.adjPolygons
@@ -153,6 +158,13 @@ class Polygon:
         return self.state
 
     def spawnAdjPolygons(self):
+
+        newPolygons = None
+
+        for adj in self.adjPolygons:
+
+
+
         return None
 
     def draw(self):
@@ -163,14 +175,18 @@ class AdjPolygon:
     def __init__(self, shape, angle=0, distance=SCALE*DISTANCE,  rotation=0):
         self.shape = shape
         self.angle = angle
-        self.distance = distance
+        self.distance = math.round(distance,2)
         self.rotation = rotation
+
+    def __repr__(self):
+        return "Shape: " + str(self.getShape()) + ", Angle: " + str(self.getAngle()) + \
+               ", Distance: " + str(self.getDistance()) + ", Rotation: " + str(self.getRotation())
 
     def getShape(self):
         return self.shape
 
-    def getPosition(self):
-        return self.position
+    def getAngle(self):
+        return self.angle
 
     def getDistance(self):
         return self.distance
@@ -181,32 +197,41 @@ class AdjPolygon:
     def incRotation(self, rotation):
         self.rotation += rotation
 
+class PolygonManager:
 
-class SquarePolygon(Polygon):
+    polygons = None
 
-    def __init__(self, position, rotation):
+    def createPolygon(self, shape, position, rotation):
 
-        super().__init__(self, position, rotation)
+        #if (!exists at position)
+        # Need to check for collider
+        points, adjPolygons = self.getPolygonData(shape)
+        polygon = Polygon(position, rotation, points, adjPolygons)
+        self.polygons.append(polygon)
+        polygon.build()
 
-        self.points = [[-0.5,-0.5],[-0.5,.5],[0.5,0.5],[0.5,-0.5]]*SCALE
+        #else get the polygon at position
 
-        self.adjPolygons = [
-            AdjPolygon(shape="Square", angle=0),
-            AdjPolygon(shape="Square", angle=90),
-            AdjPolygon(shape="Square", angle=180),
-            AdjPolygon(shape="Square", angle=270)
-        ]
+        return polygon
 
-        # self.adjPolygons = [
-        #     AdjPolygon(shape = "Square", angle = 0,   distance = SCALE*DISTANCE, rotation = 0),
-        #     AdjPolygon(shape = "Square", angle = 90,  distance = SCALE*DISTANCE, rotation = 0),
-        #     AdjPolygon(shape = "Square", angle = 180, distance = SCALE*DISTANCE, rotation = 0),
-        #     AdjPolygon(shape = "Square", angle = 270, distance = SCALE*DISTANCE, rotation = 0)
-        # ]
+    def getPolygonData(self, shape):
+        if shape == "Square":
+            points = [[-0.5, -0.5], [-0.5, .5], [0.5, 0.5], [0.5, -0.5]] * SCALE
+            adjPolygons = [
+                AdjPolygon(shape="Square", angle=0),
+                AdjPolygon(shape="Square", angle=90),
+                AdjPolygon(shape="Square", angle=180),
+                AdjPolygon(shape="Square", angle=270)
+            ]
+        elif shape == "Triangle":
+            points = [[0, 0.5], [-0.5, -0.5], [0.5, 0.5]] * SCALE
 
-        self.build()
-
-
+            adjPolygons = [
+                AdjPolygon(shape="Triangle", angle=60, rotation=180),
+                AdjPolygon(shape="Triangle", angle=180, rotation=180),
+                AdjPolygon(shape="Triangle", angle=300, rotation=180)
+            ]
+        return points, adjPolygons
 
 def polarToCart(dist, angle):
     angle = math.radians(angle)
