@@ -17,12 +17,17 @@ TILE_HEIGHT = 50
 TILE_WIDTH = 50
 MARGIN = 2
 
+
 # This is the distance multiplier to enable gaps between the polygons
 DISTANCE = 1.1
 
 # This is the scale multiplier. All coordinates for polygons are done with a unit length of 1,
 # so this is the number of pixels per unit length
 SCALE = 50
+
+# Set the state colors
+ON_COLOR = (255,0,0)
+OFF_COLOR = (0,255,0)
 
 
 class LightsOut:
@@ -129,6 +134,7 @@ class Polygon:
     position = None
     rotation = None
     points = None
+    id = None
 
     def __init__(self, position, rotation, points, adjPolygons):
         self.position = position
@@ -154,20 +160,22 @@ class Polygon:
     def getAdjPolygons(self):
         return self.adjPolygons
 
-    def state(self):
+    def getState(self):
         return self.state
 
     def spawnAdjPolygons(self):
 
         newPolygons = None
-
         for adj in self.adjPolygons:
+            1+1
 
-
-
-        return None
+        return 5
 
     def draw(self):
+        if self.getState() == True:
+            pygame.draw.polygon(screen, ON_COLOR, self.points)
+        else:
+            pygame.draw.polygon(screen, OFF_COLOR, self.points)
         return None
 
 
@@ -225,7 +233,6 @@ class PolygonManager:
             ]
         elif shape == "Triangle":
             points = [[0, 0.5], [-0.5, -0.5], [0.5, 0.5]] * SCALE
-
             adjPolygons = [
                 AdjPolygon(shape="Triangle", angle=60, rotation=180),
                 AdjPolygon(shape="Triangle", angle=180, rotation=180),
@@ -245,6 +252,17 @@ if __name__ == "__main__":
 
     screen = pygame.display.set_mode((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
     screen.fill((167, 219, 216))
+
+    # Add the hit detection via a surface hidden below the game where the color of each polygon is equal to it's ID
+    click = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
+    click.fill((0, 1, 0))
+    screen.blit(click, (0, 0))
+
+    # Add the actual game board
+    game = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
+    game.fill((255, 255, 255))
+    screen.blit(game, (0, 0))
+
     pygame.display.set_caption("Lights Out")
 
     game = LightsOut()
@@ -256,7 +274,7 @@ if __name__ == "__main__":
 
         clock.tick(30)
 
-        game.draw()
+        #game.draw()
 
         for event in pygame.event.get():
 
@@ -265,7 +283,9 @@ if __name__ == "__main__":
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
-                game.click(pos)
+                polyid = pygame.Surface.get_at(click, pos)
+                polyid = (polyid[0] << 16) + (polyid[1] << 8) + polyid[2]
+                game.click(polyid)
 
         pygame.display.flip()
     pygame.quit()
