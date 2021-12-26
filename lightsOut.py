@@ -26,14 +26,15 @@ DISTANCE = 1.1
 SCALE = 50
 
 # Set the state colors
-ON_COLOR = (255,0,0)
-OFF_COLOR = (0,255,0)
+ON_COLOR = (255, 0, 0)
+OFF_COLOR = (0, 255, 0)
 
 
 class LightsOut:
 
     polygons = None
     moves = None
+    gameGrid = None
 
     def __init__(self, fname=None):
         self.clear()
@@ -54,17 +55,23 @@ class LightsOut:
     #         for x in range(len(lstr[y])):
     #             self.grid[x][y] = int(lstr[y][x])
 
-    def draw(self):
-        for y in range(BOARD_SIZE):
-            for x in range(BOARD_SIZE):
-                i = x * TILE_WIDTH + MARGIN
-                j = y * TILE_HEIGHT + MARGIN
-                h = TILE_HEIGHT - (2 * MARGIN)
-                w = TILE_WIDTH - (2 * MARGIN)
-                if self.gameGrid[y][x] == 1:
-                    pygame.draw.rect(screen, (105, 210, 231), [i, j, w, h])
-                else:
-                    pygame.draw.rect(screen, (255, 255, 255), [i, j, w, h])
+    def drawGame(self):
+        # for y in range(BOARD_SIZE):
+        #     for x in range(BOARD_SIZE):
+        #         i = x * TILE_WIDTH + MARGIN
+        #         j = y * TILE_HEIGHT + MARGIN
+        #         h = TILE_HEIGHT - (2 * MARGIN)
+        #         w = TILE_WIDTH - (2 * MARGIN)
+        #         if self.gameGrid[y][x] == 1:
+        #             pygame.draw.rect(screen, (105, 210, 231), [i, j, w, h])
+        #         else:
+        #             pygame.draw.rect(screen, (255, 255, 255), [i, j, w, h])
+        for polygon in self.polygons:
+            polygon.drawPolygon()
+
+    def drawClickMap(self):
+        for polygon in self.polygons:
+            polygon.drawClickMap()
 
     def getAdjacent(self, x, y):
         adjs = []
@@ -110,11 +117,13 @@ class LightsOut:
     def addPolygon(self, polygon):
         self.polygons.append(polygon)
 
-class Solver:
 
-    def mod(x, modulus):
-        numer, denom = x.as_numer_denom()
-        return numer * mod_inverse(denom, modulus) % modulus
+def mod(x, modulus):
+    numer, denom = x.as_numer_denom()
+    return numer * mod_inverse(denom, modulus) % modulus
+
+
+class Solver:
 
     def getSolveMtx(self, puzzle):
         return np.concatenate((puzzle.getAdjacencyMtx(), puzzle.getStateMtx()[:, None]), axis=1)
@@ -122,7 +131,7 @@ class Solver:
     def solveRREF(self, puzzle):
         mtx = Matrix(self.getSolveMtx(puzzle))
         mtx = mtx.rref(iszerofunc=lambda x: x % 2 == 0)
-        mtx = mtx[0].applyfunc(lambda x: self.mod(x, 2))
+        mtx = mtx[0].applyfunc(lambda x: mod(x, 2))
         mtx = mtx.col(-1).reshape(len(puzzle.getGameGrid()), len(puzzle.getGameGrid()))
         return mtx
 
@@ -134,9 +143,10 @@ class Polygon:
     position = None
     rotation = None
     points = None
-    id = None
+    polyid = None
 
-    def __init__(self, position, rotation, points, adjPolygons):
+    def __init__(self, polyid, position, rotation, points, adjPolygons):
+        self.polyid = polyid
         self.position = position
         self.rotation = rotation
         self.points = points
@@ -144,7 +154,6 @@ class Polygon:
 
     def build(self):
         self.transformPoints()
-        self.draw()
         self.spawnAdjPolygons()
 
     def transformPoints(self):
@@ -171,19 +180,22 @@ class Polygon:
 
         return 5
 
-    def draw(self):
+    def drawPolygon(self):
         if self.getState() == True:
-            pygame.draw.polygon(screen, ON_COLOR, self.points)
+            pygame.draw.polygon(gameBoard, ON_COLOR, self.points)
         else:
-            pygame.draw.polygon(screen, OFF_COLOR, self.points)
+            pygame.draw.polygon(gameBoard, OFF_COLOR, self.points)
         return None
+
+    def drawClickMap(self):
+        pygame.draw.polygon(clickMap, self.polyid, self.points)
 
 
 class AdjPolygon:
     def __init__(self, shape, angle=0, distance=SCALE*DISTANCE,  rotation=0):
         self.shape = shape
         self.angle = angle
-        self.distance = math.round(distance,2)
+        self.distance = math.round(distance, 2)
         self.rotation = rotation
 
     def __repr__(self):
@@ -207,22 +219,29 @@ class AdjPolygon:
 
 class PolygonManager:
 
-    polygons = None
+    polygons = []
 
     def createPolygon(self, shape, position, rotation):
 
-        #if (!exists at position)
-        # Need to check for collider
-        points, adjPolygons = self.getPolygonData(shape)
-        polygon = Polygon(position, rotation, points, adjPolygons)
-        self.polygons.append(polygon)
-        polygon.build()
-
-        #else get the polygon at position
+        pid = pygame.Surface.get_at(clickMap, pos)
+        pid = (pid[0] << 16) + (pid[1] << 8) + pid[2]
+        if pid == ((255 << 16) + (255 << 8) + 255):  # If the point is white, no point exists there
+            points, adjPolygons = self.getPolygonData(shape)
+            if len(self.polygons) == 0 and position == [0, 0]:  # Offset the first point by its minimum spatial values
+                minpos = min(points, key=lambda t: t[1])
+                position = [abs(num) for num in minpos]
+            map(lambda x: x.incRotation(rotation), adjPolygons)
+            polygon = Polygon(position, rotation, points, adjPolygons, len(self.polygons))
+            self.polygons.append(polygon)
+            polygon.build()
+        else:
+            polygon = self.polygons[pid]
 
         return polygon
 
-    def getPolygonData(self, shape):
+    @staticmethod
+    def getPolygonData(shape):
+
         if shape == "Square":
             points = [[-0.5, -0.5], [-0.5, .5], [0.5, 0.5], [0.5, -0.5]] * SCALE
             adjPolygons = [
@@ -234,17 +253,18 @@ class PolygonManager:
         elif shape == "Triangle":
             points = [[0, 0.5], [-0.5, -0.5], [0.5, 0.5]] * SCALE
             adjPolygons = [
-                AdjPolygon(shape="Triangle", angle=60, rotation=180),
+                AdjPolygon(shape="Triangle", angle=60,  rotation=180),
                 AdjPolygon(shape="Triangle", angle=180, rotation=180),
                 AdjPolygon(shape="Triangle", angle=300, rotation=180)
             ]
         return points, adjPolygons
 
+
 def polarToCart(dist, angle):
     angle = math.radians(angle)
     x = dist * math.cos(angle)
     y = dist * math.sin(angle)
-    return x,y
+    return x, y
 
 ### Main ###
 
@@ -254,14 +274,14 @@ if __name__ == "__main__":
     screen.fill((167, 219, 216))
 
     # Add the hit detection via a surface hidden below the game where the color of each polygon is equal to it's ID
-    click = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
-    click.fill((0, 1, 0))
-    screen.blit(click, (0, 0))
+    clickMap = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
+    clickMap.fill((255, 255, 255))
+    screen.blit(clickMap, (0, 0))
 
     # Add the actual game board
-    game = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
-    game.fill((255, 255, 255))
-    screen.blit(game, (0, 0))
+    gameBoard = pygame.Surface((BOARD_SIZE * TILE_WIDTH, BOARD_SIZE * TILE_HEIGHT))
+    gameBoard.fill((255, 255, 255))
+    screen.blit(gameBoard, (0, 0))
 
     pygame.display.set_caption("Lights Out")
 
@@ -283,7 +303,7 @@ if __name__ == "__main__":
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
-                polyid = pygame.Surface.get_at(click, pos)
+                polyid = pygame.Surface.get_at(clickMap, pos)
                 polyid = (polyid[0] << 16) + (polyid[1] << 8) + polyid[2]
                 game.click(polyid)
 
