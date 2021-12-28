@@ -1,6 +1,7 @@
 import pygame
 import math
 import numpy as np
+
 import galois
 #import scipy.linalg as sp
 import sage as sg
@@ -79,6 +80,10 @@ class LightsOut:
             if (0 <= i + x < BOARD_SIZE) and (0 <= j + y < BOARD_SIZE):
                 adjs += [[i + x, j + y]]
         return adjs
+
+    def click(self, polyid):
+
+
 
     def click(self, pos):
         x = math.floor(pos[0] / TILE_WIDTH)
@@ -235,9 +240,15 @@ class PolygonManager:
             self.polygons.append(polygon)
             polygon.build()
         else:
-            polygon = self.polygons[pid]
+            polygon = self.getPolygon(pid)
 
         return polygon
+
+    def getPolygon(self, polyid):
+        return self.polygons[polyid]
+
+    def getPolygons(self):
+        return self.polygons
 
     @staticmethod
     def getPolygonData(shape):
