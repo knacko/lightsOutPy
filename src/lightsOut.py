@@ -29,7 +29,7 @@ SCALE = 50
 ON_COLOR = (255, 0, 0)
 OFF_COLOR = (0, 255, 0)
 
-GRID_SIZE = [20, 20]
+GRID_SIZE = [10, 10]
 
 
 def mod(x, modulus):
@@ -106,6 +106,15 @@ class Polygon:
     def getState(self):
         return self.state
 
+    def click(self, propogate = True):
+        print("Internal click on " + str(self.polyid))
+        self.state = not self.state
+        self.drawPolygon()
+        if propogate:
+            for adjPolygon in self.adjPolygons:
+                adjPolygon.click(propogate=False)
+
+
     def spawnAdjPolygons(self):
         self.adjPolygons = [self.polyMan.createPolygon(shape = adjPolygon.getShape(),
                                                        position = adjPolygon.getPosition(),
@@ -140,7 +149,7 @@ class AdjPolygon:
 
     def __repr__(self):
         return "Shape: " + str(self.shape) + ", Angle: " + str(self.angle) + ", Distance: " + str(self.distance) + \
-               ", Position: ", self.position, "Rotation: " + str(self.rotation)
+               ", Position: " + str(self.position) + ", Rotation: " + str(self.rotation)
 
     def getShape(self):
         return self.shape
@@ -166,22 +175,23 @@ class PolygonManager:
         maxSize = pygame.display.get_surface().get_size()
         if any(x > y for x, y in zip(position, maxSize)) or any(x < y for x, y in zip(position, (0, 0))):
             return None
+        position = [int(n) for n in position]
         pid = pygame.Surface.get_at(clickMap, position)
         pid = (pid[0] << 16) + (pid[1] << 8) + pid[2]
         if pid == ((255 << 16) + (255 << 8) + 255):  # If the point is white, no point exists there
             points, adjPolygons = self.getPolygonData(shape)
-            if len(self.polygons) == 0 and position == (0, 0):  # Offset the first point by its minimum spatial values
+            if len(self.polygons) == 0:  # Offset the first point by its minimum spatial values
                 position = tuple(map(abs, min(points, key=lambda t: t[1])))
-            map(lambda x: x.incRotation(rotation), adjPolygons)
-            map(lambda x: x.incPosition(position), adjPolygons)
+                print("First element pos: " + str(position))
+            for adjPolygon in adjPolygons:
+                adjPolygon.incPosition(position)
+                adjPolygon.incRotation(rotation)
             polygon = Polygon(polyMan = self, polyid = len(self.polygons), position = position, rotation = rotation,
                               points = points, adjPolygons = adjPolygons)
             self.polygons.append(polygon)
-            print("Built ", repr(polygon))
             polygon.build()
         else:
             polygon = self.getPolygon(pid)
-
 
         return polygon
 
@@ -210,11 +220,12 @@ class PolygonManager:
                 AdjPolygon(shape="Triangle", angle=300, rotation=180)
             ]
 
-        def scalePos(position):
-            (x, y) = position
-            return (x*SCALE, y*SCALE)
+        def scalePos(point):
+            (x, y) = point
+            return x*SCALE, y*SCALE
 
         points = [scalePos(element) for element in points]
+
         return points, adjPolygons
 
 
@@ -269,8 +280,8 @@ class LightsOut:
         return adjs
 
     def click(self, polyID):
-        print(polyID)
-
+        if (polyID != ((255 << 16) + (255 << 8) + 255)):
+            self.polyMan.getPolygon(polyID).click()
 
     # def click(self, pos):
     #     x = math.floor(pos[0] / TILE_WIDTH)
