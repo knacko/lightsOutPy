@@ -29,18 +29,20 @@ SCALE = 50
 ON_COLOR = (255, 0, 0)
 OFF_COLOR = (0, 255, 0)
 
-GRID_SIZE = [10, 10]
+GRID_SIZE = [5, 5]
 
 
 def mod(x, modulus):
     numer, denom = x.as_numer_denom()
     return numer * mod_inverse(denom, modulus) % modulus
 
+
 def polarToCart(dist, angle):
     angle = math.radians(angle)
     x = int(dist * math.cos(angle))
     y = int(dist * math.sin(angle))
     return x, y
+
 
 class Solver:
 
@@ -90,7 +92,7 @@ class Polygon:
             (ox, oy) = point
             qx = (math.cos(rot) * ox) - (math.sin(rot) * oy)
             qy = (math.sin(rot) * oy) + (math.cos(rot) * oy)
-            self.points[i] = (qx + px, qy + py)
+            self.points[i] = (round(qx + px), round(qy + py))
 
         # for i, point in enumerate(self.points):
         #     (ox, oy) = point
@@ -98,13 +100,19 @@ class Polygon:
         #     qy = oy + math.sin(rot) * (px - ox) + math.cos(rot) * (py - oy)
         #     self.points[i] = (qx, qy)
 
-        print(self.points)
-
     def getAdjPolygons(self):
         return self.adjPolygons
 
+    def getAdjPolygonID(self):
+        adjID = [adjPoly.getID() for adjPoly in self.getAdjPolygons()]
+        adjID.insert(0, self.getID())
+        return adjID
+
     def getState(self):
         return self.state
+
+    def getID(self):
+        return self.polyid
 
     def click(self, propogate = True):
         print("Internal click on " + str(self.polyid))
@@ -171,7 +179,6 @@ class PolygonManager:
     polygons = []
 
     def createPolygon(self, shape, position=(0, 0), rotation=0):
-
         maxSize = pygame.display.get_surface().get_size()
         if any(x > y for x, y in zip(position, maxSize)) or any(x < y for x, y in zip(position, (0, 0))):
             return None
@@ -182,7 +189,6 @@ class PolygonManager:
             points, adjPolygons = self.getPolygonData(shape)
             if len(self.polygons) == 0:  # Offset the first point by its minimum spatial values
                 position = tuple(map(abs, min(points, key=lambda t: t[1])))
-                print("First element pos: " + str(position))
             for adjPolygon in adjPolygons:
                 adjPolygon.incPosition(position)
                 adjPolygon.incRotation(rotation)
@@ -222,7 +228,7 @@ class PolygonManager:
 
         def scalePos(point):
             (x, y) = point
-            return x*SCALE, y*SCALE
+            return round(x*SCALE), round(y*SCALE)
 
         points = [scalePos(element) for element in points]
 
@@ -238,6 +244,7 @@ class LightsOut:
 
     def __init__(self, fname=None):
         self.polyMan.createPolygon("Square")
+        pprint(self.getAdjacencyMtx())
         # if fname is not None:
         #     self.load_level(fname)
         #print(self.getAdjacencyMtx())
@@ -255,16 +262,6 @@ class LightsOut:
     #             self.grid[x][y] = int(lstr[y][x])
 
     def drawGame(self):
-        # for y in range(BOARD_SIZE):
-        #     for x in range(BOARD_SIZE):
-        #         i = x * TILE_WIDTH + MARGIN
-        #         j = y * TILE_HEIGHT + MARGIN
-        #         h = TILE_HEIGHT - (2 * MARGIN)
-        #         w = TILE_WIDTH - (2 * MARGIN)
-        #         if self.gameGrid[y][x] == 1:
-        #             pygame.draw.rect(screen, (105, 210, 231), [i, j, w, h])
-        #         else:
-        #             pygame.draw.rect(screen, (255, 255, 255), [i, j, w, h])
         for polygon in self.polygons:
             polygon.drawPolygon()
 
@@ -272,27 +269,9 @@ class LightsOut:
         for polygon in self.polygons:
             polygon.drawClickMap()
 
-    def getAdjacent(self, x, y):
-        adjs = []
-        for i, j in adj:
-            if (0 <= i + x < BOARD_SIZE) and (0 <= j + y < BOARD_SIZE):
-                adjs += [[i + x, j + y]]
-        return adjs
-
     def click(self, polyID):
-        if (polyID != ((255 << 16) + (255 << 8) + 255)):
+        if polyID != ((255 << 16) + (255 << 8) + 255):
             self.polyMan.getPolygon(polyID).click()
-
-    # def click(self, pos):
-    #     x = math.floor(pos[0] / TILE_WIDTH)
-    #     y = math.floor(pos[1] / TILE_HEIGHT)
-    #     print("Clicked: (",x,", ",y,")")
-    #     self.press(x,y)
-
-    def press(self,x,y):
-        adjs = self.getAdjacent(x, y)
-        for i, j in adjs:
-            self.gameGrid[j][i] = (self.gameGrid[j][i] + 1) % 2
 
     def getGameGrid(self):
         return self.gameGrid
@@ -301,18 +280,19 @@ class LightsOut:
         return self.solveGrid
 
     def getAdjacencyMtx(self):
-        elems = len(self.gameGrid)*len(self.gameGrid[0])
-        adj = [[0 for i in range(elems)] for j in range(elems)]
-        for n in range(elems):
-            x = n % len(self.gameGrid)
-            y = n // len(self.gameGrid)
-            adjs = self.getAdjacent(x, y)
-            for i, j in adjs:
-                adj[n][i+j*len(self.gameGrid)] = 1
-        return np.array(adj)
+        polygons = self.polyMan.getPolygons()
+        adjMtx = []
+        for polygon in polygons:
+            adj = [0 for i in range(len(polygons))]
+            adjIDs = polygon.getAdjPolygonID()
+            print("AdjIDs:" + str(adjIDs))
+            for adjID in adjIDs:
+                adj[adjID] = 1
+            adjMtx.append(adj)
+        return adjMtx
 
     def getStateMtx(self):
-        return np.array(self.gameGrid).flatten()
+        return [polygon.getState() for polygon in self.polyMan.getPolygons()]
 
     def getSolveMtx(self):
         return
