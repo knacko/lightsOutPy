@@ -71,7 +71,7 @@ class Polygon:
         self.polyMan = polyMan
         self.polyid = polyid
         self.position = position
-        self.rotation = rotation
+        self.rotation = rotation % 360
         self.points = points
         self.adjPolygons = adjPolygons
 
@@ -82,7 +82,7 @@ class Polygon:
         self.transformPoints()
         self.drawClickMap()
         self.drawPolygon()
-        self.spawnAdjPolygons()
+        #self.spawnAdjPolygons()
 
     def transformPoints(self):
         (px, py) = self.position
@@ -119,14 +119,17 @@ class Polygon:
         self.state = not self.state
         self.drawPolygon()
         if propogate:
+            self.spawnAdjPolygons()
             for adjPolygon in self.adjPolygons:
                 adjPolygon.click(propogate=False)
 
 
     def spawnAdjPolygons(self):
+        pos = np.array(self.position)
+        rot = np.array(self.rotation)
         self.adjPolygons = [self.polyMan.createPolygon(shape = adjPolygon.getShape(),
-                                                       position = adjPolygon.getPosition(),
-                                                       rotation = adjPolygon.getRotation())
+                                                       position = pos + adjPolygon.getPosition(),
+                                                       rotation = rot + adjPolygon.getRotation())
                             for adjPolygon in self.adjPolygons]
         self.adjPolygons = [i for i in self.adjPolygons if i]
 
@@ -138,6 +141,8 @@ class Polygon:
 
         screen.blit(gameBoard, (0, 0))
         pygame.display.update()
+
+    def drawAdjGuides(self):
         return None
 
     def drawClickMap(self):
@@ -146,18 +151,19 @@ class Polygon:
         pygame.display.update()
 
 
+
 class AdjPolygon:
 
-    def __init__(self, shape, angle=0, distance=SCALE*DISTANCE,  rotation=0):
+    def __init__(self, shape, angle=0, distance=1, rotation=0):
         self.shape = shape
         self.angle = angle
-        self.distance = distance
-        self.position = polarToCart(round(distance, 2), angle)
+        self.distance = distance*SCALE*DISTANCE
+        self.position = polarToCart(self.distance, angle)
         self.rotation = rotation
 
     def __repr__(self):
         return "Shape: " + str(self.shape) + ", Angle: " + str(self.angle) + ", Distance: " + str(self.distance) + \
-               ", Position: " + str(self.position) + ", Rotation: " + str(self.rotation)
+               ", Position: " + str(self.position) + ", Rotation: " + str(self.rotation) + "\n"
 
     def getShape(self):
         return self.shape
@@ -168,11 +174,6 @@ class AdjPolygon:
     def getRotation(self):
         return self.rotation
 
-    def incRotation(self, rotation):
-        self.rotation += rotation
-
-    def incPosition(self, position):
-        self.position = tuple(map(sum, zip(self.position, position)))
 
 class PolygonManager:
 
@@ -180,7 +181,7 @@ class PolygonManager:
 
     def createPolygon(self, shape, position=(0, 0), rotation=0):
         maxSize = pygame.display.get_surface().get_size()
-        if any(x > y for x, y in zip(position, maxSize)) or any(x < y for x, y in zip(position, (0, 0))):
+        if any(x >= y for x, y in zip(position, maxSize)) or any(x <= y for x, y in zip(position, (0, 0))):
             return None
         position = [int(n) for n in position]
         pid = pygame.Surface.get_at(clickMap, position)
@@ -188,10 +189,7 @@ class PolygonManager:
         if pid == ((255 << 16) + (255 << 8) + 255):  # If the point is white, no point exists there
             points, adjPolygons = self.getPolygonData(shape)
             if len(self.polygons) == 0:  # Offset the first point by its minimum spatial values
-                position = tuple(map(abs, min(points, key=lambda t: t[1])))
-            for adjPolygon in adjPolygons:
-                adjPolygon.incPosition(position)
-                adjPolygon.incRotation(rotation)
+                position = tuple(x/2 for x in maxSize)#tuple(map(abs, min(points, key=lambda t: t[1])))
             polygon = Polygon(polyMan = self, polyid = len(self.polygons), position = position, rotation = rotation,
                               points = points, adjPolygons = adjPolygons)
             self.polygons.append(polygon)
@@ -219,11 +217,15 @@ class PolygonManager:
                 AdjPolygon(shape="Square", angle=270)
             ]
         elif shape == "Triangle":
-            points = [(0, 0.5), (-0.5, -0.5), (0.5, -0.5)]
+            centerToTop = 1/math.sqrt(3)
+            centerToBottom = math.sqrt(3)/6
+            points = [(0, centerToTop),
+                      (-0.5, -1 * centerToBottom),
+                      (0.5,  -1 * centerToBottom)]
             adjPolygons = [
-                AdjPolygon(shape="Triangle", angle=60,  rotation=180),
-                AdjPolygon(shape="Triangle", angle=180, rotation=180),
-                AdjPolygon(shape="Triangle", angle=300, rotation=180)
+                AdjPolygon(shape="Triangle", angle=30,  distance = 2*centerToBottom, rotation=180),
+                AdjPolygon(shape="Triangle", angle=150, distance = 2*centerToBottom, rotation=180),
+                AdjPolygon(shape="Triangle", angle=270, distance = 2*centerToBottom, rotation=180)
             ]
 
         def scalePos(point):
@@ -243,23 +245,8 @@ class LightsOut:
     polyMan = PolygonManager()
 
     def __init__(self, fname=None):
-        self.polyMan.createPolygon("Square")
-        pprint(self.getAdjacencyMtx())
-        # if fname is not None:
-        #     self.load_level(fname)
-        #print(self.getAdjacencyMtx())
-        # self.drawGame()
-        # self.drawClickMap()
-
-    # def load_level(self, fname):
-    #     lstr = []
-    #     f = open(fname)
-    #     for line in f:
-    #         lstr += [line.split()[0]]
-    #     f.close()
-    #     for y in range(len(lstr)):
-    #         for x in range(len(lstr[y])):
-    #             self.grid[x][y] = int(lstr[y][x])
+        position = tuple(x / 2 for x in pygame.display.get_surface().get_size())
+        self.polyMan.createPolygon("Square", position = position)
 
     def drawGame(self):
         for polygon in self.polygons:
