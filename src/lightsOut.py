@@ -82,17 +82,22 @@ class Polygon:
         self.transformPoints()
         self.drawClickMap()
         self.drawPolygon()
-        #self.spawnAdjPolygons()
+        self.spawnAdjPolygons()
 
     def transformPoints(self):
-        (px, py) = self.position
-        rot = self.rotation*math.pi/180
+        (ox, oy) = self.position
+        rot = -math.radians(self.rotation)
+
+        pprint(self.points)
+        print(rot)
 
         for i, point in enumerate(self.points):
-            (ox, oy) = point
-            qx = (math.cos(rot) * ox) - (math.sin(rot) * oy)
-            qy = (math.sin(rot) * oy) + (math.cos(rot) * oy)
-            self.points[i] = (round(qx + px), round(qy + py))
+            (px, py) = point
+            qx = (math.cos(rot) * px) - (math.sin(rot) * py)
+            qy = (math.sin(rot) * px) + (math.cos(rot) * py)
+            self.points[i] = (round(qx + ox), round(qy + oy))
+
+        pprint(self.points)
 
         # for i, point in enumerate(self.points):
         #     (ox, oy) = point
@@ -119,19 +124,16 @@ class Polygon:
         self.state = not self.state
         self.drawPolygon()
         if propogate:
-            self.spawnAdjPolygons()
+            #self.spawnAdjPolygons()
             for adjPolygon in self.adjPolygons:
                 adjPolygon.click(propogate=False)
 
-
     def spawnAdjPolygons(self):
-        pos = np.array(self.position)
-        rot = np.array(self.rotation)
         self.adjPolygons = [self.polyMan.createPolygon(shape = adjPolygon.getShape(),
-                                                       position = pos + adjPolygon.getPosition(),
-                                                       rotation = rot + adjPolygon.getRotation())
+                                                       position = np.array(self.position) + adjPolygon.calcPosition(self.rotation),
+                                                       rotation = self.rotation + adjPolygon.getRotation())
                             for adjPolygon in self.adjPolygons]
-        self.adjPolygons = [i for i in self.adjPolygons if i]
+        self.adjPolygons = [i for i in self.adjPolygons if i]  # Removes the out-of-bounds polygons
 
     def drawPolygon(self):
         if self.getState() == True:
@@ -151,10 +153,16 @@ class Polygon:
         pygame.display.update()
 
 
-
 class AdjPolygon:
 
     def __init__(self, shape, angle=0, distance=1, rotation=0):
+        """
+        Data structure for a polygon that is adjacent to its parent polygon
+        :param string shape: The name of the shape
+        :param integer angle: The polar angle from the parent object
+        :param distance: The polar distance from the parent object
+        :param rotation: The rotation of the polygon relative the parent
+        """
         self.shape = shape
         self.angle = angle
         self.distance = distance*SCALE*DISTANCE
@@ -168,11 +176,11 @@ class AdjPolygon:
     def getShape(self):
         return self.shape
 
-    def getPosition(self):
-        return self.position
-
     def getRotation(self):
         return self.rotation
+
+    def calcPosition(self, parentRotation):
+        return polarToCart(self.distance, self.angle + parentRotation + 90) #TODO: Not sure why the +90 is necessary
 
 
 class PolygonManager:
@@ -180,6 +188,7 @@ class PolygonManager:
     polygons = []
 
     def createPolygon(self, shape, position=(0, 0), rotation=0):
+
         maxSize = pygame.display.get_surface().get_size()
         if any(x >= y for x, y in zip(position, maxSize)) or any(x <= y for x, y in zip(position, (0, 0))):
             return None
@@ -223,9 +232,9 @@ class PolygonManager:
                       (-0.5, -1 * centerToBottom),
                       (0.5,  -1 * centerToBottom)]
             adjPolygons = [
-                AdjPolygon(shape="Triangle", angle=30,  distance = 2*centerToBottom, rotation=180),
-                AdjPolygon(shape="Triangle", angle=150, distance = 2*centerToBottom, rotation=180),
-                AdjPolygon(shape="Triangle", angle=270, distance = 2*centerToBottom, rotation=180)
+                AdjPolygon(shape="Triangle", angle=60,  distance = 2*centerToBottom, rotation=180),
+                AdjPolygon(shape="Triangle", angle=180, distance = 2*centerToBottom, rotation=180),
+                AdjPolygon(shape="Triangle", angle=300, distance = 2*centerToBottom, rotation=180)
             ]
 
         def scalePos(point):
@@ -246,7 +255,7 @@ class LightsOut:
 
     def __init__(self, fname=None):
         position = tuple(x / 2 for x in pygame.display.get_surface().get_size())
-        self.polyMan.createPolygon("Square", position = position)
+        self.polyMan.createPolygon("Triangle", position = position)
 
     def drawGame(self):
         for polygon in self.polygons:
