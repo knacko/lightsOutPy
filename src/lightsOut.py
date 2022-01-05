@@ -13,23 +13,19 @@ pygame.init()
 
 adj = [[0, 0], [0, -1], [-1, 0], [0, 1], [1, 0]]
 
-BOARD_SIZE = 5
-TILE_HEIGHT = 50
-TILE_WIDTH = 50
-MARGIN = 2
-
 # This is the distance multiplier to enable gaps between the polygons
 DISTANCE = 1.1
 
 # This is the scale multiplier. All coordinates for polygons are done with a unit length of 1,
 # so this is the number of pixels per unit length
 SCALE = 50
+BORDER = 25
 
 # Set the state colors
 ON_COLOR = (255, 0, 0)
 OFF_COLOR = (0, 255, 0)
 
-GRID_SIZE = [5, 5]
+GRID_SIZE = [6, 6]
 
 
 def mod(x, modulus):
@@ -46,16 +42,12 @@ def polarToCart(dist, angle):
 
 class Solver:
 
-    def getSolveMtx(self, puzzle):
-        return np.concatenate((puzzle.getAdjacencyMtx(), puzzle.getStateMtx()[:, None]), axis=1)
-
-    def solveRREF(self, puzzle):
-        mtx = Matrix(self.getSolveMtx(puzzle))
+    def solveRREF(puzzle):
+        mtx = Matrix(puzzle.getSolveMtx())
         mtx = mtx.rref(iszerofunc=lambda x: x % 2 == 0)
         mtx = mtx[0].applyfunc(lambda x: mod(x, 2))
-        mtx = mtx.col(-1).reshape(len(puzzle.getGameGrid()), len(puzzle.getGameGrid()))
+        mtx = np.array(mtx)[:,-1]
         return mtx
-
 
 class Polygon:
     shape = None
@@ -120,10 +112,10 @@ class Polygon:
         return self.polyid
 
     def click(self, propogate = True):
-        print("Internal click on " + str(self.polyid))
         self.state = not self.state
         self.drawPolygon()
         if propogate:
+            print("Internal click on " + str(self.polyid))
             #self.spawnAdjPolygons()
             for adjPolygon in self.adjPolygons:
                 adjPolygon.click(propogate=False)
@@ -190,7 +182,7 @@ class PolygonManager:
     def createPolygon(self, shape, position=(0, 0), rotation=0):
 
         maxSize = pygame.display.get_surface().get_size()
-        if any(x >= y for x, y in zip(position, maxSize)) or any(x <= y for x, y in zip(position, (0, 0))):
+        if any(x >= y-BORDER for x, y in zip(position, maxSize)) or any(x <= y for x, y in zip(position, (BORDER, BORDER))):
             return None
         position = [int(n) for n in position]
         pid = pygame.Surface.get_at(clickMap, position)
@@ -255,7 +247,7 @@ class LightsOut:
 
     def __init__(self, fname=None):
         position = tuple(x / 2 for x in pygame.display.get_surface().get_size())
-        self.polyMan.createPolygon("Triangle", position = position)
+        self.polyMan.createPolygon("Square", position = position)
 
     def drawGame(self):
         for polygon in self.polygons:
@@ -269,11 +261,8 @@ class LightsOut:
         if polyID != ((255 << 16) + (255 << 8) + 255):
             self.polyMan.getPolygon(polyID).click()
 
-    def getGameGrid(self):
-        return self.gameGrid
-
-    def getSolveGrid(self):
-        return self.solveGrid
+    def getPolyMan(self):
+        return self.polyMan
 
     def getAdjacencyMtx(self):
         polygons = self.polyMan.getPolygons()
@@ -281,21 +270,21 @@ class LightsOut:
         for polygon in polygons:
             adj = [0 for i in range(len(polygons))]
             adjIDs = polygon.getAdjPolygonID()
-            print("AdjIDs:" + str(adjIDs))
             for adjID in adjIDs:
                 adj[adjID] = 1
             adjMtx.append(adj)
         return adjMtx
 
     def getStateMtx(self):
-        return [polygon.getState() for polygon in self.polyMan.getPolygons()]
+        return list(map(int, [polygon.getState() for polygon in self.polyMan.getPolygons()]))
 
     def getSolveMtx(self):
-        return
+        return np.c_[self.getAdjacencyMtx(), self.getStateMtx()]
+
+        #return np.concatenate((s[:, None]), axis=1)
 
     def addPolygon(self, polygon):
         self.polygons.append(polygon)
-
 
 
 ### Main ###
@@ -320,6 +309,7 @@ if __name__ == "__main__":
     pygame.display.set_caption("Lights Out")
 
     game = LightsOut()
+    solver = Solver()
 
     clock = pygame.time.Clock()
 
@@ -338,6 +328,7 @@ if __name__ == "__main__":
                 clickid = pygame.Surface.get_at(clickMap, pos)
                 clickid = (clickid[0] << 16) + (clickid[1] << 8) + clickid[2]
                 game.click(clickid)
+                print(Solver.solveRREF(game))
 
         pygame.display.flip()
     pygame.quit()
