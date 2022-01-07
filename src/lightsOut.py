@@ -228,6 +228,21 @@ class PolygonManager:
                 AdjPolygon(shape="Triangle", angle=180, distance = 2*centerToBottom, rotation=180),
                 AdjPolygon(shape="Triangle", angle=300, distance = 2*centerToBottom, rotation=180)
             ]
+        elif shape == "Hexagon":
+            centerToTop = 0.5*math.sqrt(3)/2
+            points = [(-.5, 0),
+                      (-.25, centerToTop),
+                      (.25, centerToTop),
+                      (.5, 0),
+                      (0.25, -centerToTop),
+                      (-0.25, -centerToTop)]
+            adjPolygons = [
+                AdjPolygon(shape="Hexagon", angle=0,  distance=2*centerToTop, rotation=0),
+                AdjPolygon(shape="Hexagon", angle=60,  distance=2*centerToTop, rotation=0),
+                AdjPolygon(shape="Hexagon", angle=120, distance=2*centerToTop, rotation=0),
+                AdjPolygon(shape="Hexagon", angle=180, distance=2*centerToTop, rotation=0),
+                AdjPolygon(shape="Hexagon", angle=240, distance=2*centerToTop, rotation=0),
+                AdjPolygon(shape="Hexagon", angle=300, distance=2*centerToTop, rotation=0)]
 
         def scalePos(point):
             (x, y) = point
@@ -247,7 +262,7 @@ class LightsOut:
 
     def __init__(self, fname=None):
         position = tuple(x / 2 for x in pygame.display.get_surface().get_size())
-        self.polyMan.createPolygon("Square", position = position)
+        self.polyMan.createPolygon("Hexagon", position = position)
 
     def drawGame(self):
         for polygon in self.polygons:
