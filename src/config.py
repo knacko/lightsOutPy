@@ -12,6 +12,7 @@ BORDER = 25
 # Set the state colors
 ON_COLOR = (255, 0, 0)
 OFF_COLOR = (0, 255, 0)
+SOLVE_COLOR = (0, 0, 0)
 
 GRID_SIZE = [6, 6]
 

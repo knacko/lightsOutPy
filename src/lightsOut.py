@@ -37,7 +37,6 @@ class LightsOut:
         elif surface == "ClickMap":
             pygame.draw.polygon(clickMap, color, points)
             screen.blit(clickMap, (0, 0))
-        pygame.display.update()
 
     def getPolygon(self, position):
         pid = pygame.Surface.get_at(clickMap, position)
@@ -74,6 +73,19 @@ class LightsOut:
 
     def addPolygon(self, polygon):
         self.polygons.append(polygon)
+
+    def drawSolve(self, solveMtx):
+        # solver = [x ^ y for x, y in zip(solveMtx, self.getStateMtx())]
+        # print(solveMtx)
+        # print(self.getStateMtx())
+        # print(solver)
+        solver = [i for i in range(len(solveMtx)) if solveMtx[i] == 1]
+        print(solver)
+        for polyID in solver:
+            polyPos = self.polyMan.getPolygon(polyID).getPosition()
+            print(polyID, ": ", polyPos)
+            pygame.draw.circle(gameBoard, config.SOLVE_COLOR, polyPos, config.SCALE/4)
+        screen.blit(gameBoard, (0, 0))
 
 
 if __name__ == "__main__":
@@ -112,7 +124,8 @@ if __name__ == "__main__":
                 clickid = pygame.Surface.get_at(clickMap, pos)
                 clickid = (clickid[0] << 16) + (clickid[1] << 8) + clickid[2]
                 game.click(clickid)
-                print(Solver.solveRREF(game))
+                game.drawSolve(Solver.solveRREF(game))
+                # print(Solver.solveRREF(game))
 
         pygame.display.flip()
     pygame.quit()

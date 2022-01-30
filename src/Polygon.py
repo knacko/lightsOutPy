@@ -36,8 +36,8 @@ class Polygon:
         (ox, oy) = self.position
         rot = -math.radians(self.rotation)
 
-        pprint(self.points)
-        print(rot)
+        #pprint(self.points)
+        #print(rot)
 
         for i, point in enumerate(self.points):
             (px, py) = point
@@ -45,7 +45,7 @@ class Polygon:
             qy = (math.sin(rot) * px) + (math.cos(rot) * py)
             self.points[i] = (round(qx + ox), round(qy + oy))
 
-        pprint(self.points)
+        #pprint(self.points)
 
         # for i, point in enumerate(self.points):
         #     (ox, oy) = point
@@ -66,6 +66,9 @@ class Polygon:
 
     def getID(self):
         return self.polyid
+
+    def getPosition(self):
+        return self.position
 
     def click(self, propogate = True):
         self.state = not self.state
